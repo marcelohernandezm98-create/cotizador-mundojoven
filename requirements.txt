@@ -1,3 +1,5 @@
+# STREAMING_CHUNK:Declarando librerías necesarias...
 streamlit
 reportlab
 pandas
+google-genai
