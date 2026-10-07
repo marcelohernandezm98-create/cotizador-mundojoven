@@ -33,21 +33,28 @@ def consultar_asistente_ia(peticion_usuario):
         instruccion_sistema = """
         Eres un asesor experto de viajes de la agencia 'Mundo Joven'. 
         Tu objetivo es cotizar servicios de viaje (vuelos, cursos de idiomas, seguros, alojamiento) de forma realista en USD.
+        Utiliza tu herramienta de búsqueda en Google para encontrar precios actuales en el mercado.
         
         DEBES devolver tu respuesta ÚNICAMENTE como una lista de objetos JSON. No incluyas texto extra, ni saludos.
         El formato estricto debe ser:
         [
-            {"concepto": "Nombre corto del servicio (ej. Vuelo Redondo)", "descripcion": "Descripción detallada y atractiva", "precio": 500.00}
+            {
+                "concepto": "Nombre corto del servicio (ej. Vuelo Redondo)", 
+                "descripcion": "Descripción detallada", 
+                "precio": 500.00,
+                "fuente": "URL exacta de donde obtuviste la información o precio"
+            }
         ]
         """
         
         respuesta = cliente.models.generate_content(
             model='gemini-3.8-flash',
-            contents=f"Arma una propuesta de servicios realista para la siguiente solicitud del cliente: {peticion_usuario}",
+            contents=f"Busca en internet los precios actuales y arma una propuesta para: {peticion_usuario}",
             config=types.GenerateContentConfig(
                 system_instruction=instruccion_sistema,
                 response_mime_type="application/json",
-                temperature=0.7
+                temperature=0.3,
+                tools=[{"google_search": {}}] # 🟢 AQUÍ ESTÁ LA MAGIA: Conectamos Gemini a Internet
             )
         )
         
@@ -86,10 +93,18 @@ def generar_pdf_en_memoria(datos_cliente, servicios):
     elementos.append(Paragraph(info_cliente, estilos['Normal']))
     elementos.append(Spacer(1, 20))
     
-    datos_tabla = [['Concepto', 'Descripción', 'Precio (USD)']]
+    datos_tabla = [['Concepto', 'Descripción', 'Precio (MXN)']]
     total = 0
+    
+    # Creamos un estilo de celda con margen interno para que respire el texto
+    estilo_celda = ParagraphStyle('Celda', parent=estilos['Normal'], fontSize=9, leading=11)
+    
     for servicio in servicios:
-        datos_tabla.append([servicio['concepto'], servicio['descripcion'], f"${servicio['precio']:,.2f}"])
+        # Envolvemos los textos en Paragraph para activar el ajuste automático de línea (Word Wrap)
+        concepto_p = Paragraph(str(servicio.get('concepto', '')), estilo_celda)
+        descripcion_p = Paragraph(str(servicio.get('descripcion', '')), estilo_celda)
+        
+        datos_tabla.append([concepto_p, descripcion_p, f"${float(servicio['precio']):,.2f}"])
         total += float(servicio['precio'])
     
     datos_tabla.append(['', 'TOTAL ESTIMADO', f"${total:,.2f}"])
@@ -101,6 +116,7 @@ def generar_pdf_en_memoria(datos_cliente, servicios):
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('VALIGN', (0, 1), (-1, -1), 'TOP'), # Alinear el texto hacia arriba
         ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
         ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
@@ -113,7 +129,7 @@ def generar_pdf_en_memoria(datos_cliente, servicios):
     elementos.append(tabla)
     elementos.append(Spacer(1, 30))
     
-    terminos = """<font size="8" color="gray"><b>Notas importantes:</b><br/>* Precios en dólares americanos (USD).<br/>* Precios sujetos a disponibilidad y cambios sin previo aviso.<br/>* Esta cotización tiene una vigencia de 24 horas.</font>"""
+    terminos = """<font size="8" color="gray"><b>Notas importantes:</b><br/>* Precios en Pesos Mexicanos (MXN).<br/>* Precios sujetos a disponibilidad y cambios sin previo aviso.<br/>* Esta cotización tiene una vigencia de 24 horas.</font>"""
     elementos.append(Paragraph(terminos, estilos['Normal']))
     
     doc.build(elementos)
@@ -177,16 +193,37 @@ def main():
             with c1: concepto = st.selectbox("Concepto", ["Vuelo Redondo", "Vuelo Sencillo", "Curso de Idiomas", "Alojamiento", "Seguro de Viaje", "Otro"])
             with c2: descripcion = st.text_input("Descripción detallada")
             with c3: precio = st.number_input("Precio (USD)", min_value=0.0, format="%.2f", step=10.0)
+            
+            fuente = st.text_input("Enlace de referencia / Proveedor (Opcional)", placeholder="Ej. https://kayak.com/...")
+            
             if st.form_submit_button("➕ Agregar Manualmente"):
                 if descripcion:
-                    st.session_state.servicios.append({"concepto": concepto, "descripcion": descripcion, "precio": float(precio)})
+                    st.session_state.servicios.append({
+                        "concepto": concepto, 
+                        "descripcion": descripcion, 
+                        "precio": float(precio),
+                        "fuente": fuente if fuente else "Captura Manual"
+                    })
                     st.success("Agregado.")
 
     # Mostrar la tabla final
     if st.session_state.servicios:
         st.subheader("🛒 Paquete actual a cotizar:")
         df_servicios = pd.DataFrame(st.session_state.servicios)
-        st.table(df_servicios)
+        
+        # Si existe la columna fuente, la mostramos como un enlace bonito en la interfaz
+        if 'fuente' in df_servicios.columns:
+            st.dataframe(
+                df_servicios, 
+                use_container_width=True,
+                column_config={
+                    "fuente": st.column_config.LinkColumn("🔗 Enlace / Proveedor"),
+                    "precio": st.column_config.NumberColumn("Precio (USD)", format="$%.2f")
+                }
+            )
+        else:
+            st.dataframe(df_servicios, use_container_width=True)
+            
         if st.button("🗑️ Limpiar carrito"):
             st.session_state.servicios = []
             st.rerun()
