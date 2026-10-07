@@ -1,43 +1,75 @@
 import streamlit as st
 import io
+import json
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+import pandas as pd
+from google import genai
+from google.genai import types
 
+# ==========================================
+# CONFIGURACIÓN DE IA (GOOGLE GEMINI)
+# ==========================================
+# ⚠️ NOTA: Extraemos la API Key de los secretos de Streamlit por seguridad.
+if "GEMINI_API_KEY" in st.secrets:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+else:
+    API_KEY = None
+
+def consultar_asistente_ia(peticion_usuario):
+    """
+    Se conecta a Google Gemini para sugerir servicios y precios basados en la petición del asesor.
+    """
+    if not API_KEY:
+        st.error("⚠️ No se encontró la API Key. Por favor, configúrala en .streamlit/secrets.toml")
+        return None
+        
+    try:
+        cliente = genai.Client(api_key=API_KEY)
+        
+        instruccion_sistema = """
+        Eres un asesor experto de viajes de la agencia 'Mundo Joven'. 
+        Tu objetivo es cotizar servicios de viaje (vuelos, cursos de idiomas, seguros, alojamiento) de forma realista en USD.
+        
+        DEBES devolver tu respuesta ÚNICAMENTE como una lista de objetos JSON. No incluyas texto extra, ni saludos.
+        El formato estricto debe ser:
+        [
+            {"concepto": "Nombre corto del servicio (ej. Vuelo Redondo)", "descripcion": "Descripción detallada y atractiva", "precio": 500.00}
+        ]
+        """
+        
+        respuesta = cliente.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=f"Arma una propuesta de servicios realista para la siguiente solicitud del cliente: {peticion_usuario}",
+            config=types.GenerateContentConfig(
+                system_instruction=instruccion_sistema,
+                response_mime_type="application/json",
+                temperature=0.7
+            )
+        )
+        
+        # Convertimos el texto de respuesta (que viene en JSON) a una lista de diccionarios de Python
+        sugerencias = json.loads(respuesta.text)
+        return sugerencias
+        
+    except Exception as e:
+        st.error(f"Error de conexión con la IA: {e}")
+        return None
+
+# ==========================================
+# GENERACIÓN DE PDF (REPORTLAB)
+# ==========================================
 def generar_pdf_en_memoria(datos_cliente, servicios):
-    """
-    Genera el PDF de Mundo Joven y lo devuelve en un buffer de memoria (BytesIO),
-    ideal para aplicaciones web como Streamlit.
-    """
     buffer = io.BytesIO()
-    
-    # Configuración básica del documento
-    doc = SimpleDocTemplate(buffer, pagesize=letter,
-                            rightMargin=40, leftMargin=40,
-                            topMargin=40, bottomMargin=18)
-    
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=18)
     elementos = []
     estilos = getSampleStyleSheet()
     
-    estilo_titulo = ParagraphStyle(
-        'TituloMundoJoven',
-        parent=estilos['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor("#0033a0"), # Azul corporativo Mundo Joven
-        spaceAfter=20,
-        alignment=1 # Centrado
-    )
-    
-    estilo_subtitulo = ParagraphStyle(
-        'Subtitulo',
-        parent=estilos['Normal'],
-        fontSize=12,
-        textColor=colors.HexColor("#333333"),
-        spaceAfter=20,
-        alignment=1
-    )
+    estilo_titulo = ParagraphStyle('TituloMundoJoven', parent=estilos['Heading1'], fontSize=24, textColor=colors.HexColor("#0033a0"), spaceAfter=20, alignment=1)
+    estilo_subtitulo = ParagraphStyle('Subtitulo', parent=estilos['Normal'], fontSize=12, textColor=colors.HexColor("#333333"), spaceAfter=20, alignment=1)
     
     elementos.append(Paragraph("✈️ <b>MUNDO JOVEN</b>", estilo_titulo))
     elementos.append(Paragraph("<b>¡La aventura de tu vida comienza aquí!</b>", estilo_subtitulo))
@@ -56,157 +88,116 @@ def generar_pdf_en_memoria(datos_cliente, servicios):
     
     datos_tabla = [['Concepto', 'Descripción', 'Precio (USD)']]
     total = 0
-    
     for servicio in servicios:
-        datos_tabla.append([
-            servicio['concepto'], 
-            servicio['descripcion'], 
-            f"${servicio['precio']:,.2f}"
-        ])
-        total += servicio['precio']
+        datos_tabla.append([servicio['concepto'], servicio['descripcion'], f"${servicio['precio']:,.2f}"])
+        total += float(servicio['precio'])
     
-    # Fila de Total
     datos_tabla.append(['', 'TOTAL ESTIMADO', f"${total:,.2f}"])
     
     tabla = Table(datos_tabla, colWidths=[120, 300, 100])
-    estilo_tabla = TableStyle([
-        # Encabezado
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#ffcc00")), # Amarillo dinámico
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#ffcc00")),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        
-        # Cuerpo de la tabla
         ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-        ('ALIGN', (2, 1), (2, -1), 'RIGHT'), # Precios a la derecha
+        ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
         ('GRID', (0, 0), (-1, -2), 1, colors.HexColor("#dddddd")),
-        
-        # Fila de Total
         ('FONTNAME', (1, -1), (-1, -1), 'Helvetica-Bold'),
         ('BACKGROUND', (1, -1), (-1, -1), colors.HexColor("#0033a0")),
         ('TEXTCOLOR', (1, -1), (-1, -1), colors.white),
         ('ALIGN', (1, -1), (1, -1), 'RIGHT'),
-    ])
-    
-    tabla.setStyle(estilo_tabla)
+    ]))
     elementos.append(tabla)
     elementos.append(Spacer(1, 30))
     
-    terminos = """
-    <font size="8" color="gray">
-    <b>Notas importantes:</b><br/>
-    * Precios en dólares americanos (USD).<br/>
-    * Precios sujetos a disponibilidad y cambios sin previo aviso.<br/>
-    * La tarifa del vuelo no se garantiza hasta la emisión del boleto.<br/>
-    * Esta cotización tiene una vigencia de 24 horas.<br/>
-    </font>
-    """
+    terminos = """<font size="8" color="gray"><b>Notas importantes:</b><br/>* Precios en dólares americanos (USD).<br/>* Precios sujetos a disponibilidad y cambios sin previo aviso.<br/>* Esta cotización tiene una vigencia de 24 horas.</font>"""
     elementos.append(Paragraph(terminos, estilos['Normal']))
     
-    # Generar el PDF
     doc.build(elementos)
-    buffer.seek(0) # Regresar el puntero al inicio del archivo en memoria
+    buffer.seek(0)
     return buffer
 
+# ==========================================
+# INTERFAZ WEB (STREAMLIT)
+# ==========================================
 def main():
-    # Configuración de la página
-    st.set_page_config(page_title="Cotizador Mundo Joven", page_icon="🌎", layout="wide")
+    st.set_page_config(page_title="Cotizador AI - Mundo Joven", page_icon="🌎", layout="wide")
+    st.markdown("<h1 style='text-align: center; color: #0033a0;'>🌎 Asistente Inteligente de Cotizaciones</h1>", unsafe_allow_html=True)
     
-    st.markdown("<h1 style='text-align: center; color: #0033a0;'>🌎 Generador de Cotizaciones - Mundo Joven</h1>", unsafe_allow_html=True)
-    st.write("Completa los datos del viajero, agrega los servicios y descarga el PDF profesional al instante.")
-    
-    # Inicializar variable de estado para guardar los servicios de la sesión actual
     if 'servicios' not in st.session_state:
         st.session_state.servicios = []
+    if 'sugerencias_temporales' not in st.session_state:
+        st.session_state.sugerencias_temporales = []
 
     st.header("1. Datos del Viajero", divider="blue")
     col1, col2 = st.columns(2)
-    
     with col1:
-        nombre_cliente = st.text_input("Nombre completo del viajero", placeholder="Ej. Carlos Mendoza")
-        destino = st.text_input("Destino principal", placeholder="Ej. Vancouver, Canadá")
-        
+        nombre_cliente = st.text_input("Nombre completo del viajero")
+        destino = st.text_input("Destino principal")
     with col2:
-        fechas = st.text_input("Fechas de viaje", placeholder="Ej. 15 Sep 2027 - 15 Dic 2027")
-        asesor = st.text_input("Nombre de Asesor y Sucursal", placeholder="Ej. Ana López (Sucursal Roma)")
+        fechas = st.text_input("Fechas de viaje")
+        asesor = st.text_input("Nombre de Asesor y Sucursal")
 
     st.header("2. Servicios a Cotizar", divider="orange")
     
-    # Formulario para agregar un servicio nuevo
-    with st.form("form_servicios", clear_on_submit=True):
-        st.write("Agrega un nuevo servicio al paquete:")
-        col_s1, col_s2, col_s3 = st.columns([1, 2, 1])
+    # Sistema de Pestañas para elegir entre IA o Manual
+    tab_ia, tab_manual = st.tabs(["🤖 Asistente de IA (Nuevo)", "✍️ Captura Manual"])
+    
+    with tab_ia:
+        st.info("Describe lo que busca el cliente y la IA estimará los precios y armará los conceptos automáticamente.")
+        peticion = st.text_area("¿Qué paquete necesitas armar?", placeholder="Ej. Vuelo redondo a Londres en junio, 2 semanas de curso de inglés y seguro médico.")
         
-        with col_s1:
-            concepto = st.selectbox("Concepto", [
-                "Vuelo Redondo", "Vuelo Sencillo", "Curso de Idiomas", 
-                "Alojamiento", "Seguro de Viaje", "Gestión de Visa", "Tour/Excursión", "Otro"
-            ])
-        with col_s2:
-            descripcion = st.text_input("Descripción detallada", placeholder="Ej. Homestay habitación individual...")
-        with col_s3:
-            precio = st.number_input("Precio (USD)", min_value=0.0, format="%.2f", step=10.0)
-            
-        btn_agregar = st.form_submit_button("➕ Agregar Servicio")
-        
-        if btn_agregar:
-            if descripcion.strip() == "":
-                st.error("Por favor ingresa una descripción para el servicio.")
+        if st.button("✨ Generar sugerencia con Gemini"):
+            if peticion:
+                with st.spinner("La IA está analizando opciones y precios del mercado..."):
+                    sugerencias = consultar_asistente_ia(peticion)
+                    if sugerencias:
+                        st.session_state.sugerencias_temporales = sugerencias
             else:
-                st.session_state.servicios.append({
-                    "concepto": concepto,
-                    "descripcion": descripcion,
-                    "precio": float(precio)
-                })
-                st.success(f"{concepto} agregado correctamente.")
+                st.warning("Escribe algo para que la IA pueda ayudarte.")
+                
+        # Mostrar sugerencias de la IA si existen
+        if st.session_state.sugerencias_temporales:
+            st.success("¡Sugerencias generadas con éxito! Revisa la propuesta:")
+            df_sug = pd.DataFrame(st.session_state.sugerencias_temporales)
+            st.dataframe(df_sug, use_container_width=True)
+            
+            if st.button("✅ Agregar estos servicios a la cotización final"):
+                for item in st.session_state.sugerencias_temporales:
+                    st.session_state.servicios.append(item)
+                st.session_state.sugerencias_temporales = [] # Limpiamos
+                st.rerun()
 
+    with tab_manual:
+        with st.form("form_servicios", clear_on_submit=True):
+            c1, c2, c3 = st.columns([1, 2, 1])
+            with c1: concepto = st.selectbox("Concepto", ["Vuelo Redondo", "Vuelo Sencillo", "Curso de Idiomas", "Alojamiento", "Seguro de Viaje", "Otro"])
+            with c2: descripcion = st.text_input("Descripción detallada")
+            with c3: precio = st.number_input("Precio (USD)", min_value=0.0, format="%.2f", step=10.0)
+            if st.form_submit_button("➕ Agregar Manualmente"):
+                if descripcion:
+                    st.session_state.servicios.append({"concepto": concepto, "descripcion": descripcion, "precio": float(precio)})
+                    st.success("Agregado.")
+
+    # Mostrar la tabla final
     if st.session_state.servicios:
-        st.subheader("Paquete actual:")
-        
-        # Mostrar como tabla visual en Streamlit
-        import pandas as pd
+        st.subheader("🛒 Paquete actual a cotizar:")
         df_servicios = pd.DataFrame(st.session_state.servicios)
-        # Formatear columna de precio para la vista
-        df_servicios_display = df_servicios.copy()
-        df_servicios_display['precio'] = df_servicios_display['precio'].apply(lambda x: f"${x:,.2f}")
-        st.table(df_servicios_display)
-        
-        # Botón para limpiar servicios
-        if st.button("🗑️ Limpiar lista de servicios"):
+        st.table(df_servicios)
+        if st.button("🗑️ Limpiar carrito"):
             st.session_state.servicios = []
             st.rerun()
 
     st.header("3. Generar Documento", divider="blue")
-    
-    # Validación antes de generar
     if st.session_state.servicios and nombre_cliente and destino:
-        datos_cliente = {
-            "nombre": nombre_cliente,
-            "destino": destino,
-            "fechas": fechas,
-            "asesor": asesor
-        }
-        
-        # Botón de descarga
+        datos_cliente = {"nombre": nombre_cliente, "destino": destino, "fechas": fechas, "asesor": asesor}
         pdf_buffer = generar_pdf_en_memoria(datos_cliente, st.session_state.servicios)
-        
-        nombre_archivo = f"Cotizacion_{nombre_cliente.replace(' ', '_')}_{destino.replace(' ', '')}.pdf"
-        
-        st.success("¡Cotización lista para descargar!")
-        st.download_button(
-            label="📥 Descargar Cotización (PDF)",
-            data=pdf_buffer,
-            file_name=nombre_archivo,
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True
-        )
-    elif not st.session_state.servicios:
-        st.info("Agrega al menos un servicio para generar la cotización.")
+        st.download_button("📥 Descargar PDF Oficial", data=pdf_buffer, file_name=f"Cotizacion_{nombre_cliente.replace(' ', '_')}.pdf", mime="application/pdf", type="primary", use_container_width=True)
     else:
-        st.info("Completa los datos principales del viajero y destino para habilitar la descarga.")
+        st.info("Completa los datos del viajero y agrega al menos un servicio para habilitar la descarga del PDF.")
 
 if __name__ == "__main__":
     main()
