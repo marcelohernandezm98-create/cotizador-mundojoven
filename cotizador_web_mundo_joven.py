@@ -42,7 +42,7 @@ def consultar_asistente_ia(peticion_usuario):
         """
         
         respuesta = cliente.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.8-flash',
             contents=f"Arma una propuesta de servicios realista para la siguiente solicitud del cliente: {peticion_usuario}",
             config=types.GenerateContentConfig(
                 system_instruction=instruccion_sistema,
