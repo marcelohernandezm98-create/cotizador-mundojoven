@@ -4,9 +4,10 @@ import json
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import pandas as pd
+import os
 from google import genai
 from google.genai import types
 
@@ -76,11 +77,33 @@ def generar_pdf_en_memoria(datos_cliente, servicios):
     estilos = getSampleStyleSheet()
     
     estilo_titulo = ParagraphStyle('TituloMundoJoven', parent=estilos['Heading1'], fontSize=24, textColor=colors.HexColor("#0033a0"), spaceAfter=20, alignment=1)
-    estilo_subtitulo = ParagraphStyle('Subtitulo', parent=estilos['Normal'], fontSize=12, textColor=colors.HexColor("#333333"), spaceAfter=20, alignment=1)
+    estilo_subtitulo = ParagraphStyle('Subtitulo', parent=estilos['Normal'], fontSize=12, textColor=colors.HexColor("#333333"), spaceAfter=10, alignment=1)
     
-    elementos.append(Paragraph("✈️ <b>MUNDO JOVEN</b>", estilo_titulo))
-    elementos.append(Paragraph("<b>¡La aventura de tu vida comienza aquí!</b>", estilo_subtitulo))
-    elementos.append(Spacer(1, 12))
+    # --- NUEVO ENCABEZADO CON LOGO CORPORATIVO Y SUCURSAL ---
+    ruta_logo = "image_7f26fa.png"
+    
+    # Verificamos si la imagen existe en la carpeta para evitar errores
+    if os.path.exists(ruta_logo):
+        logo = Image(ruta_logo, width=120, height=120)
+        
+        # Usamos una tabla oculta para mantener el logo y la sucursal perfectamente centrados
+        datos_encabezado = [
+            [logo],
+            [Paragraph("<font color='#e3001b' size='14'><b>SUCURSAL VILLAHERMOSA</b></font>", estilo_subtitulo)]
+        ]
+        tabla_encabezado = Table(datos_encabezado)
+        tabla_encabezado.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0,0), (-1,0), 5), # Espacio entre el logo y el texto
+        ]))
+        elementos.append(tabla_encabezado)
+    else:
+        # Respaldo en caso de que la imagen se mueva o borre por accidente
+        elementos.append(Paragraph("✈️ <b>MUNDO JOVEN</b>", estilo_titulo))
+        elementos.append(Paragraph("<font color='#e3001b'><b>SUCURSAL VILLAHERMOSA</b></font>", estilo_subtitulo))
+        
+    elementos.append(Spacer(1, 20))
     
     fecha_hoy = datetime.now().strftime("%d/%m/%Y")
     info_cliente = f"""
@@ -154,7 +177,17 @@ def main():
         nombre_cliente = st.text_input("Nombre completo del viajero")
         destino = st.text_input("Destino principal")
     with col2:
-        fechas = st.text_input("Fechas de viaje")
+        # Reemplazamos text_input por date_input para usar un calendario
+        fechas_input = st.date_input("Fechas de viaje (Selecciona inicio y fin)", value=[], format="DD/MM/YYYY")
+        
+        # Formateamos el resultado del calendario a texto para el PDF
+        if len(fechas_input) == 2:
+            fechas = f"{fechas_input[0].strftime('%d/%m/%Y')} al {fechas_input[1].strftime('%d/%m/%Y')}"
+        elif len(fechas_input) == 1:
+            fechas = fechas_input[0].strftime('%d/%m/%Y')
+        else:
+            fechas = "Por definir"
+            
         asesor = st.text_input("Nombre de Asesor y Sucursal")
 
     st.header("2. Servicios a Cotizar", divider="orange")
