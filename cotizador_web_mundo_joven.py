@@ -64,7 +64,11 @@ def consultar_asistente_ia(peticion_usuario):
         return sugerencias
         
     except Exception as e:
-        st.error(f"Error de conexión con la IA: {e}")
+        error_str = str(e)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+            st.warning("⏳ La IA ha alcanzado su límite de consultas gratuitas por minuto. Por favor, espera 60 segundos y vuelve a dar clic en generar.")
+        else:
+            st.error(f"Error de conexión con la IA: {e}")
         return None
 
 # ==========================================
