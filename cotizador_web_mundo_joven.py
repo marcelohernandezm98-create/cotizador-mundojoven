@@ -1,277 +1,189 @@
 import streamlit as st
-import io
-import json
+import urllib.parse
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-import pandas as pd
-import os
-from google import genai
-from google.genai import types
 
 # ==========================================
-# CONFIGURACIÓN DE IA (GOOGLE GEMINI)
+# CONFIGURACIÓN DE LA PÁGINA (B2C - Modo Cliente)
 # ==========================================
-# ⚠️ NOTA: Extraemos la API Key de los secretos de Streamlit por seguridad.
-if "GEMINI_API_KEY" in st.secrets:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
+st.set_page_config(page_title="Arma tu Viaje - Mundo Joven", page_icon="✈️", layout="centered")
+
+# Simulación de Logo (Centrado)
+st.markdown("<h1 style='text-align: center; color: #e3001b;'>✈️ MUNDO JOVEN</h1>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #0033a0;'>¡Arma tu viaje y descubre tu presupuesto ideal! 🌍</h3>", unsafe_allow_html=True)
+st.write("---")
+
+# ==========================================
+# BASE DE DATOS SIMULADA (Precios Base Temporada Baja desde CDMX)
+# ==========================================
+# Precios en USD (Basados en tabla de operación comercial de Mundo Joven)
+destinos_por_region = {
+    "🇲🇽 Nacionales": {
+        "Cancún": {"baja": 510, "alta": 1030, "tours": {"Xcaret Plus": 140, "Catamarán a Isla Mujeres": 75, "Chichén Itzá Clásico": 60}},
+        "Los Cabos": {"baja": 645, "alta": 1400, "tours": {"Paseo al Arco en Yate": 60, "Tour en Camello por el desierto": 90, "Avistamiento de Ballenas (Temp)": 75}},
+        "Mérida": {"baja": 400, "alta": 735, "tours": {"Tour Uxmal y Kabah": 45, "Cenotes de Cuzamá": 40, "Paseo por Paseo de Montejo en Calandria": 20}},
+        "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
+    },
+    "🇪🇺 Europa": {
+        "Francia": {"baja": 1470, "alta": 2470, "tours": {"Entrada a la Torre Eiffel (Cima)": 40, "Paseo en Barco por el Sena": 20, "Excursión a Versalles": 75}},
+        "Italia": {"baja": 1550, "alta": 2450, "tours": {"Coliseo y Foro Romano sin filas": 55, "Paseo en Góndola": 40, "Tour al Vaticano": 65}},
+        "España": {"baja": 1165, "alta": 2060, "tours": {"Tour Estadio Bernabéu": 30, "Entrada a la Sagrada Familia": 35, "Show de Flamenco con cena": 60}},
+        "Portugal": {"baja": 1280, "alta": 2100, "tours": {"Tour a Sintra y Cascais": 70, "Paseo en barco por el río Tajo": 30}},
+        "Suiza": {"baja": 1750, "alta": 2900, "tours": {"Excursión al Monte Titlis": 125, "Tour por los Alpes Suizos": 150}},
+        "Grecia": {"baja": 1500, "alta": 2550, "tours": {"Visita Guiada a la Acrópolis": 45, "Crucero de un día por 3 islas": 110}},
+        "Turquía": {"baja": 1400, "alta": 2150, "tours": {"Paseo en Globo en Capadocia": 225, "Tour por Santa Sofía y Mezquita Azul": 50}},
+        "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
+    },
+    "🌍 África y Medio Oriente": {
+        "Marruecos": {"baja": 1400, "alta": 2150, "tours": {"Noche en el Desierto con Camellos": 100, "Tour por la Medina y Zocos": 30}},
+        "Sudáfrica": {"baja": 1950, "alta": 2950, "tours": {"Safari fotográfico de 1 día": 175, "Tour Península y Cabo de Buena Esperanza": 90}},
+        "Egipto": {"baja": 1550, "alta": 2400, "tours": {"Pirámides de Giza y Esfinge": 60, "Crucero por el Nilo (Básico)": 200}},
+        "Jordania": {"baja": 1730, "alta": 2600, "tours": {"Entrada y Tour por Petra": 125, "Excursión al Mar Muerto": 75}},
+        "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
+    },
+    "🌏 Asia": {
+        "Japón": {"baja": 2000, "alta": 3200, "tours": {"Pase JR Pass (1 semana)": 300, "Tour al Monte Fuji": 110, "Ceremonia del Té Tradicional": 40}},
+        "Corea del Sur": {"baja": 2050, "alta": 3100, "tours": {"Excursión a la Zona Desmilitarizada (DMZ)": 75, "Alquiler de Hanbok (Traje típico)": 20}},
+        "China": {"baja": 1700, "alta": 2700, "tours": {"Excursión a la Gran Muralla": 65, "Crucero por el río Huangpu": 30}},
+        "Arabia Saudita": {"baja": 2000, "alta": 3100, "tours": {"Safari en el desierto y cena": 100, "Tour histórico por Diriyah": 75}},
+        "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
+    },
+    "🌎 Sudamérica": {
+        "Argentina": {"baja": 1030, "alta": 1650, "tours": {"Show de Tango con Cena": 75, "Excursión al Glaciar Perito Moreno": 150}},
+        "Brasil": {"baja": 1100, "alta": 1700, "tours": {"Cristo Redentor y Pan de Azúcar": 90, "Tour a Angra dos Reis": 60}},
+        "Colombia": {"baja": 750, "alta": 1200, "tours": {"Excursión a Guatapé y Piedra del Peñol": 40, "Catedral de Sal de Zipaquirá": 35}},
+        "Perú": {"baja": 800, "alta": 1350, "tours": {"Tour Machu Picchu (Tren Clásico)": 275, "Montaña de los 7 Colores": 60}},
+        "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
+    },
+    "🌎 Norteamérica y Centroamérica": {
+        "Canadá": {"baja": 900, "alta": 1540, "tours": {"Excursión a Cataratas del Niágara": 100, "Puente Colgante de Capilano": 45}},
+        "EUA": {"baja": 850, "alta": 1540, "tours": {"CityPass Nueva York": 140, "Tour Estudios Universal Hollywood": 125}},
+        "Costa Rica": {"baja": 750, "alta": 1290, "tours": {"Tour Volcán Arenal y Aguas Termales": 125, "Tirolesa en Bosque Nuboso": 75}},
+        "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
+    }
+}
+
+# ==========================================
+# INTERFAZ DEL CLIENTE
+# ==========================================
+st.subheader("1. ¿A qué región quieres viajar?")
+region_seleccionada = st.selectbox("Selecciona tu continente/región:", list(destinos_por_region.keys()))
+
+st.subheader("2. ¿Cuál es tu destino soñado?")
+# Al seleccionar la región, el segundo menú se actualiza solo con los países de esa región
+destino_seleccionado = st.selectbox(f"Selecciona tu país en {region_seleccionada}:", list(destinos_por_region[region_seleccionada].keys()))
+
+st.subheader("3. ¿Cuándo planeas viajar?")
+fechas_input = st.date_input("Selecciona tus fechas estimadas (Ida y Regreso)", value=[], format="DD/MM/YYYY")
+
+st.subheader("4. Diseña tu experiencia")
+
+# Instrucción clara para el usuario sobre cómo ordenar
+st.info("💡 **Instrucción:** Selecciona hasta 3 tours en orden de importancia. El primero que elijas será tu prioridad máxima para que nuestros asesores aseguren esa experiencia.")
+
+# Selector múltiple de Tours dinámico con límite de 3
+tours_disponibles = destinos_por_region[region_seleccionada][destino_seleccionado]["tours"]
+tours_seleccionados = st.multiselect(
+    "🗺️ Top 3 de Actividades/Tours:", 
+    list(tours_disponibles.keys()),
+    max_selections=3,
+    help="Selecciona tu actividad favorita primero."
+)
+
+st.subheader("5. ¿Algo más que debamos saber?")
+# Se actualizó el texto para invitar a pedir tours que no están en la lista
+comentarios_extra = st.text_area(
+    "Escribe aquí si buscas un tour diferente que no está en la lista, si viajas en grupo, etc.", 
+    placeholder="Ej. Voy de luna de miel, quiero un tour gastronómico que no vi en las opciones..."
+)
+
+st.write("---")
+
+# ==========================================
+# LÓGICA DE ESTACIONALIDAD
+# ==========================================
+if len(fechas_input) > 0:
+    mes_salida = fechas_input[0].month
+    
+    # Definimos los meses de temporada alta (Verano y Fin de Año)
+    meses_temporada_alta = [6, 7, 8, 12] # Junio, Julio, Agosto, Diciembre
+    
+    # Obtenemos los precios según el destino
+    precios = destinos_por_region[region_seleccionada][destino_seleccionado]
+
+    # Validamos si es temporada alta o baja
+    if mes_salida in meses_temporada_alta:
+        costo_base = precios["alta"]
+        etiqueta_temporada = "☀️ Tarifa desde (Temporada Alta)"
+        color_alerta = "error"
+    else:
+        costo_base = precios["baja"]
+        etiqueta_temporada = "🍃 Tarifa desde (Temporada Baja)"
+        color_alerta = "success"
+        
+    # ==========================================
+    # CÁLCULO DEL PRESUPUESTO
+    # ==========================================
+    costo_total = costo_base
+    
+    # Se ajusta la moneda a USD y se unifica vuelo + hotel según la tabla
+    resumen_servicios = f"- ✈️🏨 Paquete Base (Vuelo redondo + Hospedaje): ${costo_base:,.2f} USD\n"
+        
+    if tours_seleccionados:
+        resumen_servicios += "- 🗺️ Top Tours seleccionados (En orden de prioridad):\n"
+        # Se enumera la lista de tours para que en WhatsApp llegue como 1., 2., 3.
+        for i, tour in enumerate(tours_seleccionados, 1):
+            costo_t = precios["tours"][tour]
+            costo_total += costo_t
+            resumen_servicios += f"   {i}. {tour}: ${costo_t:,.2f} USD\n"
+
+    # ==========================================
+    # MOSTRAR RESULTADOS AL CLIENTE
+    # ==========================================
+    st.header("Tu Presupuesto Estimado 💸")
+    
+    if color_alerta == "error":
+        st.error(f"¡Atención! Viajas en verano o diciembre. Mostrando {etiqueta_temporada}")
+    else:
+        st.success(f"¡Genial! Tienes flexibilidad. Mostrando {etiqueta_temporada}")
+        
+    # Validamos si seleccionó "Otros" para poner un mensaje amigable en lugar de $0.00
+    if destino_seleccionado == "Otros (Especificar en comentarios)":
+        st.info("📌 Como elegiste un destino no listado, uno de nuestros expertos diseñará tu presupuesto a la medida. ¡Envíanos tus datos!")
+    else:
+        st.metric(label="Inversión total aproximada (USD)", value=f"${costo_total:,.2f}")
+    
+    with st.expander("Ver desglose de tu viaje"):
+        st.text(resumen_servicios)
+        st.caption("* Estos precios son estimaciones 'Desde', volando de CDMX en USD, sujetos a disponibilidad al reservar.")
+        st.caption("🎒 **Nota de servicio:** El vuelo considerado incluye 25 kg de equipaje documentado y 10 kg en mano. El hospedaje contemplado es en hoteles categoría 3 estrellas.")
+
+    # ==========================================
+    # GENERACIÓN DE ENLACE A WHATSAPP
+    # ==========================================
+    st.write("---")
+    st.subheader("¡Hazlo realidad! 🚀")
+    st.write("¿Te gusta este estimado? Da clic en el botón para enviar tu itinerario a WhatsApp. Un asesor experto de la **Sucursal Villahermosa** te contactará para afinar los detalles y darte tu tarifa final exacta.")
+    
+    # Número de teléfono de Villahermosa (Asegúrate de cambiar este número por el real a 10 dígitos)
+    numero_whatsapp = "529931234567" 
+    
+    # Preparamos el bloque de comentarios para el mensaje
+    comentarios_texto = f"\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
+    
+    # Mensaje pre-escrito en USD con las notas incluidas
+    mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en su web y me gustaría cotizarlo formalmente. Estos son mis datos:\n\n*Destino:* {destino_seleccionado} ({region_seleccionada})\n*Temporada:* {etiqueta_temporada}\n*Servicios que busco:*\n{resumen_servicios}\n*Presupuesto Estimado:* ${costo_total:,.2f} USD{comentarios_texto}\n\n*Nota del sistema:* Cotización basada en vuelos con 25kg documentados + 10kg mano y hospedaje 3 estrellas.\n\n¿Me ayudan a diseñarlo?"
+    
+    mensaje_codificado = urllib.parse.quote(mensaje)
+    link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
+    
+    # Botón HTML estilizado
+    st.markdown(f"""
+        <a href="{link_whatsapp}" target="_blank">
+            <button style="background-color: #25D366; color: white; border: none; padding: 15px 32px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
+                📲 Enviar Itinerario por WhatsApp
+            </button>
+        </a>
+    """, unsafe_allow_html=True)
+
 else:
-    API_KEY = None
-
-def consultar_asistente_ia(peticion_usuario):
-    """
-    Se conecta a Google Gemini para sugerir servicios y precios basados en la petición del asesor.
-    """
-    if not API_KEY:
-        st.error("⚠️ No se encontró la API Key. Por favor, configúrala en .streamlit/secrets.toml")
-        return None
-        
-    try:
-        cliente = genai.Client(api_key=API_KEY)
-        
-        instruccion_sistema = """
-        Eres un asesor experto de viajes de la agencia 'Mundo Joven'. 
-        Tu objetivo es cotizar servicios de viaje (vuelos, cursos de idiomas, seguros, alojamiento) de forma realista en USD.
-        Utiliza tu herramienta de búsqueda en Google para encontrar precios actuales en el mercado.
-        
-        DEBES devolver tu respuesta ÚNICAMENTE como una lista de objetos JSON. No incluyas texto extra, ni saludos.
-        El formato estricto debe ser:
-        [
-            {
-                "concepto": "Nombre corto del servicio (ej. Vuelo Redondo)", 
-                "descripcion": "Descripción detallada", 
-                "precio": 500.00,
-                "fuente": "URL exacta de donde obtuviste la información o precio"
-            }
-        ]
-        """
-        
-        respuesta = cliente.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=f"Busca en internet los precios actuales y arma una propuesta para: {peticion_usuario}",
-            config=types.GenerateContentConfig(
-                system_instruction=instruccion_sistema,
-                response_mime_type="application/json",
-                temperature=0.3,
-                tools=[{"google_search": {}}] # 🟢 AQUÍ ESTÁ LA MAGIA: Conectamos Gemini a Internet
-            )
-        )
-        
-        # Convertimos el texto de respuesta (que viene en JSON) a una lista de diccionarios de Python
-        sugerencias = json.loads(respuesta.text)
-        return sugerencias
-        
-    except Exception as e:
-        error_str = str(e)
-        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-            st.warning("⏳ La IA ha alcanzado su límite de consultas gratuitas por minuto. Por favor, espera 60 segundos y vuelve a dar clic en generar.")
-        else:
-            st.error(f"Error de conexión con la IA: {e}")
-        return None
-
-# ==========================================
-# GENERACIÓN DE PDF (REPORTLAB)
-# ==========================================
-def generar_pdf_en_memoria(datos_cliente, servicios):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=18)
-    elementos = []
-    estilos = getSampleStyleSheet()
-    
-    estilo_titulo = ParagraphStyle('TituloMundoJoven', parent=estilos['Heading1'], fontSize=24, textColor=colors.HexColor("#0033a0"), spaceAfter=20, alignment=1)
-    estilo_subtitulo = ParagraphStyle('Subtitulo', parent=estilos['Normal'], fontSize=12, textColor=colors.HexColor("#333333"), spaceAfter=10, alignment=1)
-    
-    # --- NUEVO ENCABEZADO CON LOGO CORPORATIVO Y SUCURSAL ---
-    ruta_logo = "image_7f26fa.png"
-    
-    # Verificamos si la imagen existe en la carpeta para evitar errores
-    if os.path.exists(ruta_logo):
-        logo = Image(ruta_logo, width=120, height=120)
-        
-        # Usamos una tabla oculta para mantener el logo y la sucursal perfectamente centrados
-        datos_encabezado = [
-            [logo],
-            [Paragraph("<font color='#e3001b' size='14'><b>SUCURSAL VILLAHERMOSA</b></font>", estilo_subtitulo)]
-        ]
-        tabla_encabezado = Table(datos_encabezado)
-        tabla_encabezado.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('BOTTOMPADDING', (0,0), (-1,0), 5), # Espacio entre el logo y el texto
-        ]))
-        elementos.append(tabla_encabezado)
-    else:
-        # Respaldo en caso de que la imagen se mueva o borre por accidente
-        elementos.append(Paragraph("✈️ <b>MUNDO JOVEN</b>", estilo_titulo))
-        elementos.append(Paragraph("<font color='#e3001b'><b>SUCURSAL VILLAHERMOSA</b></font>", estilo_subtitulo))
-        
-    elementos.append(Spacer(1, 20))
-    
-    fecha_hoy = datetime.now().strftime("%d/%m/%Y")
-    info_cliente = f"""
-    <b>Fecha de cotización:</b> {fecha_hoy}<br/>
-    <b>Asesor:</b> {datos_cliente.get('asesor', 'Asesor Mundo Joven')}<br/><br/>
-    <b>Viajero:</b> {datos_cliente.get('nombre', '')}<br/>
-    <b>Destino:</b> {datos_cliente.get('destino', '')}<br/>
-    <b>Fechas de viaje:</b> {datos_cliente.get('fechas', '')}
-    """
-    elementos.append(Paragraph(info_cliente, estilos['Normal']))
-    elementos.append(Spacer(1, 20))
-    
-    datos_tabla = [['Concepto', 'Descripción', 'Precio (MXN)']]
-    total = 0
-    
-    # Creamos un estilo de celda con margen interno para que respire el texto
-    estilo_celda = ParagraphStyle('Celda', parent=estilos['Normal'], fontSize=9, leading=11)
-    
-    for servicio in servicios:
-        # Envolvemos los textos en Paragraph para activar el ajuste automático de línea (Word Wrap)
-        concepto_p = Paragraph(str(servicio.get('concepto', '')), estilo_celda)
-        descripcion_p = Paragraph(str(servicio.get('descripcion', '')), estilo_celda)
-        
-        datos_tabla.append([concepto_p, descripcion_p, f"${float(servicio['precio']):,.2f}"])
-        total += float(servicio['precio'])
-    
-    datos_tabla.append(['', 'TOTAL ESTIMADO', f"${total:,.2f}"])
-    
-    tabla = Table(datos_tabla, colWidths=[120, 300, 100])
-    tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#ffcc00")),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('VALIGN', (0, 1), (-1, -1), 'TOP'), # Alinear el texto hacia arriba
-        ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-        ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('GRID', (0, 0), (-1, -2), 1, colors.HexColor("#dddddd")),
-        ('FONTNAME', (1, -1), (-1, -1), 'Helvetica-Bold'),
-        ('BACKGROUND', (1, -1), (-1, -1), colors.HexColor("#0033a0")),
-        ('TEXTCOLOR', (1, -1), (-1, -1), colors.white),
-        ('ALIGN', (1, -1), (1, -1), 'RIGHT'),
-    ]))
-    elementos.append(tabla)
-    elementos.append(Spacer(1, 30))
-    
-    terminos = """<font size="8" color="gray"><b>Notas importantes:</b><br/>* Precios en Pesos Mexicanos (MXN).<br/>* Precios sujetos a disponibilidad y cambios sin previo aviso.<br/>* Esta cotización tiene una vigencia de 24 horas.</font>"""
-    elementos.append(Paragraph(terminos, estilos['Normal']))
-    
-    doc.build(elementos)
-    buffer.seek(0)
-    return buffer
-
-# ==========================================
-# INTERFAZ WEB (STREAMLIT)
-# ==========================================
-def main():
-    st.set_page_config(page_title="Cotizador AI - Mundo Joven", page_icon="🌎", layout="wide")
-    st.markdown("<h1 style='text-align: center; color: #0033a0;'>🌎 Asistente Inteligente de Cotizaciones</h1>", unsafe_allow_html=True)
-    
-    if 'servicios' not in st.session_state:
-        st.session_state.servicios = []
-    if 'sugerencias_temporales' not in st.session_state:
-        st.session_state.sugerencias_temporales = []
-
-    st.header("1. Datos del Viajero", divider="blue")
-    col1, col2 = st.columns(2)
-    with col1:
-        nombre_cliente = st.text_input("Nombre completo del viajero")
-        destino = st.text_input("Destino principal")
-    with col2:
-        # Reemplazamos text_input por date_input para usar un calendario
-        fechas_input = st.date_input("Fechas de viaje (Selecciona inicio y fin)", value=[], format="DD/MM/YYYY")
-        
-        # Formateamos el resultado del calendario a texto para el PDF
-        if len(fechas_input) == 2:
-            fechas = f"{fechas_input[0].strftime('%d/%m/%Y')} al {fechas_input[1].strftime('%d/%m/%Y')}"
-        elif len(fechas_input) == 1:
-            fechas = fechas_input[0].strftime('%d/%m/%Y')
-        else:
-            fechas = "Por definir"
-            
-        asesor = st.text_input("Nombre de Asesor y Sucursal")
-
-    st.header("2. Servicios a Cotizar", divider="orange")
-    
-    # Sistema de Pestañas para elegir entre IA o Manual
-    tab_ia, tab_manual = st.tabs(["🤖 Asistente de IA (Nuevo)", "✍️ Captura Manual"])
-    
-    with tab_ia:
-        st.info("Describe lo que busca el cliente y la IA estimará los precios y armará los conceptos automáticamente.")
-        peticion = st.text_area("¿Qué paquete necesitas armar?", placeholder="Ej. Vuelo redondo a Londres en junio, 2 semanas de curso de inglés y seguro médico.")
-        
-        if st.button("✨ Generar sugerencia con Gemini"):
-            if peticion:
-                with st.spinner("La IA está analizando opciones y precios del mercado..."):
-                    sugerencias = consultar_asistente_ia(peticion)
-                    if sugerencias:
-                        st.session_state.sugerencias_temporales = sugerencias
-            else:
-                st.warning("Escribe algo para que la IA pueda ayudarte.")
-                
-        # Mostrar sugerencias de la IA si existen
-        if st.session_state.sugerencias_temporales:
-            st.success("¡Sugerencias generadas con éxito! Revisa la propuesta:")
-            df_sug = pd.DataFrame(st.session_state.sugerencias_temporales)
-            st.dataframe(df_sug, use_container_width=True)
-            
-            if st.button("✅ Agregar estos servicios a la cotización final"):
-                for item in st.session_state.sugerencias_temporales:
-                    st.session_state.servicios.append(item)
-                st.session_state.sugerencias_temporales = [] # Limpiamos
-                st.rerun()
-
-    with tab_manual:
-        with st.form("form_servicios", clear_on_submit=True):
-            c1, c2, c3 = st.columns([1, 2, 1])
-            with c1: concepto = st.selectbox("Concepto", ["Vuelo Redondo", "Vuelo Sencillo", "Curso de Idiomas", "Alojamiento", "Seguro de Viaje", "Otro"])
-            with c2: descripcion = st.text_input("Descripción detallada")
-            with c3: precio = st.number_input("Precio (USD)", min_value=0.0, format="%.2f", step=10.0)
-            
-            fuente = st.text_input("Enlace de referencia / Proveedor (Opcional)", placeholder="Ej. https://kayak.com/...")
-            
-            if st.form_submit_button("➕ Agregar Manualmente"):
-                if descripcion:
-                    st.session_state.servicios.append({
-                        "concepto": concepto, 
-                        "descripcion": descripcion, 
-                        "precio": float(precio),
-                        "fuente": fuente if fuente else "Captura Manual"
-                    })
-                    st.success("Agregado.")
-
-    # Mostrar la tabla final
-    if st.session_state.servicios:
-        st.subheader("🛒 Paquete actual a cotizar:")
-        df_servicios = pd.DataFrame(st.session_state.servicios)
-        
-        # Si existe la columna fuente, la mostramos como un enlace bonito en la interfaz
-        if 'fuente' in df_servicios.columns:
-            st.dataframe(
-                df_servicios, 
-                use_container_width=True,
-                column_config={
-                    "fuente": st.column_config.LinkColumn("🔗 Enlace / Proveedor"),
-                    "precio": st.column_config.NumberColumn("Precio (USD)", format="$%.2f")
-                }
-            )
-        else:
-            st.dataframe(df_servicios, use_container_width=True)
-            
-        if st.button("🗑️ Limpiar carrito"):
-            st.session_state.servicios = []
-            st.rerun()
-
-    st.header("3. Generar Documento", divider="blue")
-    if st.session_state.servicios and nombre_cliente and destino:
-        datos_cliente = {"nombre": nombre_cliente, "destino": destino, "fechas": fechas, "asesor": asesor}
-        pdf_buffer = generar_pdf_en_memoria(datos_cliente, st.session_state.servicios)
-        st.download_button("📥 Descargar PDF Oficial", data=pdf_buffer, file_name=f"Cotizacion_{nombre_cliente.replace(' ', '_')}.pdf", mime="application/pdf", type="primary", use_container_width=True)
-    else:
-        st.info("Completa los datos del viajero y agrega al menos un servicio para habilitar la descarga del PDF.")
-
-if __name__ == "__main__":
-    main()
+    st.info("👆 Por favor, selecciona las fechas de tu viaje en el calendario para calcular tu presupuesto.")
