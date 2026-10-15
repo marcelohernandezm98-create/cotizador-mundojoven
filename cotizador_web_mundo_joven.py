@@ -13,14 +13,41 @@ st.markdown("<h3 style='text-align: center; color: #0033a0;'>¡Arma tu viaje y d
 st.write("---")
 
 # ==========================================
-# BASE DE DATOS SIMULADA (Precios Base Temporada Baja desde CDMX)
+# 1. DATOS DEL CLIENTE (CAPTURA DE LEADS)
 # ==========================================
-# Precios en USD (Basados en tabla de operación comercial de Mundo Joven)
+st.subheader("👤 1. Compártenos tus datos")
+st.write("Para poder diseñar tu experiencia a la medida, necesitamos conocerte un poco más.")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    nombre = st.text_input("Nombre *")
+    email = st.text_input("Correo Electrónico *")
+    adultos = st.number_input("Número de adultos", min_value=1, step=1, help="Campo opcional, por defecto es 1")
+
+with col2:
+    apellido = st.text_input("Apellido *")
+    telefono = st.text_input("Teléfono / WhatsApp *")
+    ninos = st.number_input("Número de niños", min_value=0, step=1, help="Campo opcional")
+
+presupuesto = st.selectbox(
+    "¿Cuál es el presupuesto estimado que tienes en mente? (USD) *", 
+    ["Selecciona un rango...", "Menos de $1,000 USD", "$1,000 - $2,000 USD", "$2,000 - $3,500 USD", "$3,500 - $5,000 USD", "Más de $5,000 USD"]
+)
+
+# Validación de campos obligatorios
+datos_completos = bool(nombre.strip() and apellido.strip() and email.strip() and telefono.strip() and presupuesto != "Selecciona un rango...")
+
+st.write("---")
+
+# ==========================================
+# BASE DE DATOS SIMULADA (Precios Base Temp Baja vs Alta en USD)
+# ==========================================
 destinos_por_region = {
     "🇲🇽 Nacionales": {
         "Cancún": {"baja": 510, "alta": 1030, "tours": {"Xcaret Plus": 140, "Catamarán a Isla Mujeres": 75, "Chichén Itzá Clásico": 60}},
         "Los Cabos": {"baja": 645, "alta": 1400, "tours": {"Paseo al Arco en Yate": 60, "Tour en Camello por el desierto": 90, "Avistamiento de Ballenas (Temp)": 75}},
-        "Mérida": {"baja": 400, "alta": 735, "tours": {"Tour Uxmal y Kabah": 45, "Cenotes de Cuzamá": 40, "Paseo por Paseo de Montejo en Calandria": 20}},
+        "Mérida": {"baja": 400, "alta": 735, "tours": {"Tour Uxmal y Kabah": 45, "Cenotes de Cuzamá": 40, "Paseo de Montejo en Calandria": 20}},
         "Otros (Especificar en comentarios)": {"baja": 0, "alta": 0, "tours": {}}
     },
     "🇪🇺 Europa": {
@@ -63,92 +90,78 @@ destinos_por_region = {
 }
 
 # ==========================================
-# INTERFAZ DEL CLIENTE
+# 2. INTERFAZ DEL VIAJE
 # ==========================================
-st.subheader("1. ¿A qué región quieres viajar?")
+st.subheader("✈️ 2. ¿A dónde quieres viajar?")
 region_seleccionada = st.selectbox("Selecciona tu continente/región:", list(destinos_por_region.keys()))
 
-st.subheader("2. ¿Cuál es tu destino soñado?")
 # Al seleccionar la región, el segundo menú se actualiza solo con los países de esa región
-destino_seleccionado = st.selectbox(f"Selecciona tu país en {region_seleccionada}:", list(destinos_por_region[region_seleccionada].keys()))
+destino_seleccionado = st.selectbox(f"Selecciona tu destino en {region_seleccionada}:", list(destinos_por_region[region_seleccionada].keys()))
 
-st.subheader("3. ¿Cuándo planeas viajar?")
+st.subheader("📅 3. ¿Cuándo planeas viajar?")
 fechas_input = st.date_input("Selecciona tus fechas estimadas (Ida y Regreso)", value=[], format="DD/MM/YYYY")
 
-st.subheader("4. Diseña tu experiencia")
-
-# Instrucción clara para el usuario sobre cómo ordenar
+st.subheader("🗺️ 4. Diseña tu experiencia")
 st.info("💡 **Instrucción:** Selecciona hasta 3 tours en orden de importancia. El primero que elijas será tu prioridad máxima para que nuestros asesores aseguren esa experiencia.")
 
-# Selector múltiple de Tours dinámico con límite de 3
 tours_disponibles = destinos_por_region[region_seleccionada][destino_seleccionado]["tours"]
 tours_seleccionados = st.multiselect(
-    "🗺️ Top 3 de Actividades/Tours:", 
+    "Top 3 de Actividades/Tours que no te quieres perder:", 
     list(tours_disponibles.keys()),
-    max_selections=3,
-    help="Selecciona tu actividad favorita primero."
+    max_selections=3
 )
 
-st.subheader("5. ¿Algo más que debamos saber?")
-# Se actualizó el texto para invitar a pedir tours que no están en la lista
+st.subheader("✍️ 5. ¿Algo más que debamos saber?")
 comentarios_extra = st.text_area(
-    "Escribe aquí si buscas un tour diferente que no está en la lista, si viajas en grupo, etc.", 
-    placeholder="Ej. Voy de luna de miel, quiero un tour gastronómico que no vi en las opciones..."
+    "Si buscas un tour diferente que no está en la lista, si viajas por un motivo especial (ej. luna de miel, graduación) escríbelo aquí:", 
+    placeholder="Ej. Quiero hacer un tour gastronómico en París..."
 )
 
 st.write("---")
 
 # ==========================================
-# LÓGICA DE ESTACIONALIDAD
+# CÁLCULO DEL PRESUPUESTO Y ESTACIONALIDAD
 # ==========================================
-if len(fechas_input) > 0:
+if len(fechas_input) == 2: # Nos aseguramos de que seleccionen ida y vuelta
     mes_salida = fechas_input[0].month
     
-    # Definimos los meses de temporada alta (Verano y Fin de Año)
-    meses_temporada_alta = [6, 7, 8, 12] # Junio, Julio, Agosto, Diciembre
+    # Temporada alta: Junio, Julio, Agosto, Diciembre
+    meses_temporada_alta = [6, 7, 8, 12] 
     
-    # Obtenemos los precios según el destino
     precios = destinos_por_region[region_seleccionada][destino_seleccionado]
 
-    # Validamos si es temporada alta o baja
     if mes_salida in meses_temporada_alta:
         costo_base = precios["alta"]
-        etiqueta_temporada = "☀️ Tarifa desde (Temporada Alta)"
+        etiqueta_temporada = "☀️ Tarifa Estimada (Temporada Alta)"
         color_alerta = "error"
     else:
         costo_base = precios["baja"]
-        etiqueta_temporada = "🍃 Tarifa desde (Temporada Baja)"
+        etiqueta_temporada = "🍃 Tarifa Estimada (Temporada Baja)"
         color_alerta = "success"
         
-    # ==========================================
-    # CÁLCULO DEL PRESUPUESTO
-    # ==========================================
     costo_total = costo_base
     
-    # Se ajusta la moneda a USD y se unifica vuelo + hotel según la tabla
     resumen_servicios = f"- ✈️🏨 Paquete Base (Vuelo redondo + Hospedaje): ${costo_base:,.2f} USD\n"
         
     if tours_seleccionados:
         resumen_servicios += "- 🗺️ Top Tours seleccionados (En orden de prioridad):\n"
-        # Se enumera la lista de tours para que en WhatsApp llegue como 1., 2., 3.
         for i, tour in enumerate(tours_seleccionados, 1):
             costo_t = precios["tours"][tour]
             costo_total += costo_t
             resumen_servicios += f"   {i}. {tour}: ${costo_t:,.2f} USD\n"
 
     # ==========================================
-    # MOSTRAR RESULTADOS AL CLIENTE
+    # MOSTRAR RESULTADOS
     # ==========================================
     st.header("Tu Presupuesto Estimado 💸")
     
     if color_alerta == "error":
         st.error(f"¡Atención! Viajas en verano o diciembre. Mostrando {etiqueta_temporada}")
     else:
-        st.success(f"¡Genial! Tienes flexibilidad. Mostrando {etiqueta_temporada}")
+        st.success(f"¡Genial! Tienes flexibilidad de fechas. Mostrando {etiqueta_temporada}")
         
-    # Validamos si seleccionó "Otros" para poner un mensaje amigable en lugar de $0.00
     if destino_seleccionado == "Otros (Especificar en comentarios)":
-        st.info("📌 Como elegiste un destino no listado, uno de nuestros expertos diseñará tu presupuesto a la medida. ¡Envíanos tus datos!")
+        st.info("📌 Como elegiste un destino no listado, uno de nuestros expertos diseñará tu presupuesto a la medida. ¡Envíanos tus datos en el botón de abajo!")
     else:
         st.metric(label="Inversión total aproximada (USD)", value=f"${costo_total:,.2f}")
     
@@ -162,28 +175,30 @@ if len(fechas_input) > 0:
     # ==========================================
     st.write("---")
     st.subheader("¡Hazlo realidad! 🚀")
-    st.write("¿Te gusta este estimado? Da clic en el botón para enviar tu itinerario a WhatsApp. Un asesor experto de la **Sucursal Villahermosa** te contactará para afinar los detalles y darte tu tarifa final exacta.")
     
-    # Número de teléfono de Villahermosa (Asegúrate de cambiar este número por el real a 10 dígitos)
-    numero_whatsapp = "529931234567" 
-    
-    # Preparamos el bloque de comentarios para el mensaje
-    comentarios_texto = f"\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
-    
-    # Mensaje pre-escrito en USD con las notas incluidas
-    mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en su web y me gustaría cotizarlo formalmente. Estos son mis datos:\n\n*Destino:* {destino_seleccionado} ({region_seleccionada})\n*Temporada:* {etiqueta_temporada}\n*Servicios que busco:*\n{resumen_servicios}\n*Presupuesto Estimado:* ${costo_total:,.2f} USD{comentarios_texto}\n\n*Nota del sistema:* Cotización basada en vuelos con 25kg documentados + 10kg mano y hospedaje 3 estrellas.\n\n¿Me ayudan a diseñarlo?"
-    
-    mensaje_codificado = urllib.parse.quote(mensaje)
-    link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
-    
-    # Botón HTML estilizado
-    st.markdown(f"""
-        <a href="{link_whatsapp}" target="_blank">
-            <button style="background-color: #25D366; color: white; border: none; padding: 15px 32px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
-                📲 Enviar Itinerario por WhatsApp
-            </button>
-        </a>
-    """, unsafe_allow_html=True)
+    if not datos_completos:
+        st.warning("⚠️ Por favor, completa tus datos personales en la sección superior (Nombre, Apellido, Email, Teléfono y Presupuesto) para poder enviar tu cotización a nuestros asesores.")
+    else:
+        st.write(f"¡Todo listo, {nombre}! Da clic en el botón para enviar tu itinerario a WhatsApp. Un asesor experto de la **Sucursal Villahermosa** te contactará con tu tarifa final.")
+        
+        # Número de teléfono de Villahermosa
+        numero_whatsapp = "529931234567" 
+        
+        comentarios_texto = f"\n\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
+        
+        # El mensaje ahora incluye todos los datos del cliente
+        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellido}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestino: {destino_seleccionado} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Presupuesto Estimado Web:* ${costo_total:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con 25kg + 10kg y hospedaje 3 estrellas.\n\n¿Me ayudan a cerrarlo?"
+        
+        mensaje_codificado = urllib.parse.quote(mensaje)
+        link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
+        
+        st.markdown(f"""
+            <a href="{link_whatsapp}" target="_blank">
+                <button style="background-color: #25D366; color: white; border: none; padding: 15px 32px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
+                    📲 Enviar Itinerario por WhatsApp
+                </button>
+            </a>
+        """, unsafe_allow_html=True)
 
 else:
-    st.info("👆 Por favor, selecciona las fechas de tu viaje en el calendario para calcular tu presupuesto.")
+    st.info("👆 Por favor, selecciona las fechas exactas (Ida y Regreso) en el calendario para calcular tu presupuesto.")
