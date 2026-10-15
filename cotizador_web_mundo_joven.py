@@ -29,7 +29,6 @@ with col1:
     email = st.text_input("Correo Electrónico *")
     telefono = st.text_input("Teléfono / WhatsApp *")
     
-
 with col2:
     adultos = st.number_input("Número de adultos", min_value=1, step=1, help="Campo opcional, por defecto es 1")
     ninos = st.number_input("Número de niños", min_value=0, step=1, help="Campo opcional")
@@ -46,6 +45,7 @@ st.write("---")
 
 # ==========================================
 # BASE DE DATOS SIMULADA (Precios Paquete Base USD)
+# (Columna Izq = Alta, Columna Der = Baja)
 # ==========================================
 destinos_por_region = {
     "🇲🇽 Nacionales": {
@@ -55,7 +55,7 @@ destinos_por_region = {
         "Otros (Especificar en comentarios)": {"alta": 0, "baja": 0, "tours": {}}
     },
     "🇪🇺 Europa": {
-        "Francia": {"alta": 2470, "baja": 1470, "tours": {"Entrada a la Torre Eiffel (Cima)": 40, "Paseo en Barco por el Sena": 20, "Excursión a Versalles": 75}},
+        "Francia": {"alta": 2470, "baja": 1470, "tours": {"Entrada a la Torre Eiffel (Cima)": 40, "Paseo en Barco por el Sena": 20, "Excursión a Versalles": 75, "Disneyland Paris": 130, "Museo de Louvre": 30}},
         "Italia": {"alta": 2450, "baja": 1550, "tours": {"Coliseo y Foro Romano sin filas": 55, "Paseo en Góndola": 40, "Tour al Vaticano": 65}},
         "España": {"alta": 2060, "baja": 1165, "tours": {"Tour Estadio Bernabéu": 30, "Entrada a la Sagrada Familia": 35, "Show de Flamenco con cena": 60}},
         "Portugal": {"alta": 2100, "baja": 1280, "tours": {"Tour a Sintra y Cascais": 70, "Paseo en barco por el río Tajo": 30}},
@@ -72,7 +72,7 @@ destinos_por_region = {
         "Otros (Especificar en comentarios)": {"alta": 0, "baja": 0, "tours": {}}
     },
     "🌏 Asia": {
-        "Japón": {"alta": 3200, "baja": 2000, "tours": {"Pase JR Pass (1 semana)": 300, "Tour al Monte Fuji": 110, "Ceremonia del Té Tradicional": 40}},
+        "Japón": {"alta": 3200, "baja": 2000, "tours": {"Pase JR Pass (1 semana)": 300, "Tour al Monte Fuji": 110, "Ceremonia del Té Tradicional": 40, "Disneyland Tokio": 90}},
         "Corea del Sur": {"alta": 3100, "baja": 2050, "tours": {"Excursión a la Zona Desmilitarizada (DMZ)": 75, "Alquiler de Hanbok (Traje típico)": 20}},
         "China": {"alta": 2700, "baja": 1700, "tours": {"Excursión a la Gran Muralla": 65, "Crucero por el río Huangpu": 30}},
         "Arabia Saudita": {"alta": 3100, "baja": 2000, "tours": {"Safari en el desierto y cena": 100, "Tour histórico por Diriyah": 75}},
@@ -225,23 +225,22 @@ if len(fechas_input) == 2 and destinos_seleccionados:
     st.subheader("¡Hazlo realidad! 🚀")
     
     if not datos_completos:
-        st.warning("⚠️ Por favor, completa tus datos personales en la sección superior (Nombre, Apellidos, Email, Teléfono y Presupuesto) para poder enviar tu cotización a nuestros asesores.")
+        st.warning("⚠️ Por favor, completa tus datos personales en la sección superior (Nombre, Apellidos, Email, Teléfono y Presupuesto) para poder solicitar tu itinerario detallado.")
     else:
-        st.write(f"¡Todo listo, {nombre}! Da clic en el botón para enviar tu itinerario a WhatsApp. Un asesor experto de la **Sucursal Villahermosa** te contactará con tu tarifa final.")
-        
-        numero_whatsapp = "522281310507" 
+        st.success("¡Datos completos! Envíanos tu información para afinar los detalles y darte la tarifa final.")
         
         comentarios_texto = f"\n\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
         
-        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellidos}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Gran Total Web:* ${gran_total_viaje:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
+        # Ajuste de cierre: "Estimado desde"
+        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellidos}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Estimado desde:* ${gran_total_viaje:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
         
         mensaje_codificado = urllib.parse.quote(mensaje)
-        link_whatsapp = f"https://wa.me/{numero_whatsapp}?text={mensaje_codificado}"
+        link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
         
         st.markdown(f"""
             <a href="{link_whatsapp}" target="_blank">
                 <button style="background-color: #25D366; color: white; border: none; padding: 15px 32px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
-                    📲 Enviar Itinerario a Sucursal Villahermosa
+                    📲 Enviar mi Itinerario por WhatsApp
                 </button>
             </a>
         """, unsafe_allow_html=True)
