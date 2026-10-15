@@ -46,7 +46,6 @@ st.write("---")
 
 # ==========================================
 # BASE DE DATOS SIMULADA (Precios Paquete Base USD)
-# (Columna Izq = Alta, Columna Der = Baja)
 # ==========================================
 destinos_por_region = {
     "🇲🇽 Nacionales": {
@@ -152,15 +151,6 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         etiqueta_temporada = "🍃 Tarifa Estimada (Temporada Baja)"
         color_alerta = "success"
         
-    # --- NUEVA LÓGICA DE CÁLCULO MULTIDESTINO ($350) ---
-    # ... existing code ...
-    if es_temporada_alta:
-        etiqueta_temporada = "☀️ Tarifa Estimada (Temporada Alta)"
-        color_alerta = "error"
-    else:
-        etiqueta_temporada = "🍃 Tarifa Estimada (Temporada Baja)"
-        color_alerta = "success"
-        
     # --- LÓGICA DE CÁLCULO MULTIDESTINO ($350) ---
     precios_base_seleccionados = []
     
@@ -170,7 +160,7 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         if precio_actual > 0: # Evitar procesar "Otros" matemáticamente aquí
             precios_base_seleccionados.append(precio_actual)
             
-    # ¡AQUÍ ESTÁ LA CLAVE! Inicializamos en 0 antes de cualquier condición
+    # Inicializamos en 0 antes de cualquier condición
     costo_base_por_persona = 0
     desglose_multidestino_texto = ""
     
@@ -179,21 +169,6 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         paises_extra = len(precios_base_seleccionados) - 1
         suplemento = paises_extra * 350
         costo_base_por_persona = costo_base_principal + suplemento
-        
-        if paises_extra > 0:
-            desglose_multidestino_texto = f" (Incluye vuelo principal + suplemento por {paises_extra} país(es) adicional(es))"
-            
-    # --- CÁLCULO DE TOURS POR PERSONA ---
-    costo_tours_por_persona = 0
-    if tours_seleccionados:
-        for tour_key in tours_seleccionados:
-            costo_tours_por_persona += tours_disponibles[tour_key]
-
-    # Ahora sí sumará sin error porque ambas variables existen
-    costo_total_por_persona = costo_base_por_persona + costo_tours_por_persona
-    
-    # --- CÁLCULO TOTAL DE PASAJEROS ---
-# ... existing code ...
         
         if paises_extra > 0:
             desglose_multidestino_texto = f" (Incluye vuelo principal + suplemento por {paises_extra} país(es) adicional(es))"
@@ -250,18 +225,18 @@ if len(fechas_input) == 2 and destinos_seleccionados:
     st.subheader("¡Hazlo realidad! 🚀")
     
     if not datos_completos:
-        st.warning("⚠️ Por favor, completa tus datos personales en la sección superior (Nombre, Apellido, Email, Teléfono y Presupuesto) para poder enviar tu cotización a nuestros asesores.")
+        st.warning("⚠️ Por favor, completa tus datos personales en la sección superior (Nombre, Apellidos, Email, Teléfono y Presupuesto) para poder enviar tu cotización a nuestros asesores.")
     else:
         st.write(f"¡Todo listo, {nombre}! Da clic en el botón para enviar tu itinerario a WhatsApp. Un asesor experto de la **Sucursal Villahermosa** te contactará con tu tarifa final.")
         
-        numero_whatsapp = "529931234567" # REEMPLAZAR CON EL DE VILLAHERMOSA
+        numero_whatsapp = "522281310507" 
         
         comentarios_texto = f"\n\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
         
         mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellidos}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Gran Total Web:* ${gran_total_viaje:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
         
         mensaje_codificado = urllib.parse.quote(mensaje)
-        link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
+        link_whatsapp = f"https://wa.me/{numero_whatsapp}?text={mensaje_codificado}"
         
         st.markdown(f"""
             <a href="{link_whatsapp}" target="_blank">
