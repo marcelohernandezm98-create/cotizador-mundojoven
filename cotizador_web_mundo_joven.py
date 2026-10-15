@@ -9,7 +9,6 @@ st.info("💡 ** Esta pagina es para fines informativos. Todos los costos y prec
 st.set_page_config(page_title="Arma tu Viaje", page_icon="✈️", layout="centered")
 
 # Simulación de Logo (Centrado)
-st.markdown("<h1 style='text-align: center; color: #e3001b;'>✈️ MUNDO JOVEN</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: #0033a0;'>¡Arma tu viaje y descubre tu presupuesto ideal! 🌍</h3>", unsafe_allow_html=True)
 
 # Aviso de transparencia Multidestino al inicio
