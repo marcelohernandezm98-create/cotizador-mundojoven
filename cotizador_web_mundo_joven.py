@@ -177,18 +177,27 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         if paises_extra > 0:
             desglose_multidestino_texto = f" (Incluye vuelo principal + suplemento por {paises_extra} país(es) adicional(es))"
             
-    costo_total = costo_base_total
+    # --- CÁLCULO DE TOURS POR PERSONA ---
+    costo_tours_por_persona = 0
+    if tours_seleccionados:
+        for tour_key in tours_seleccionados:
+            costo_tours_por_persona += tours_disponibles[tour_key]
+
+    costo_total_por_persona = costo_base_por_persona + costo_tours_por_persona
+    
+    # --- CÁLCULO TOTAL DE PASAJEROS ---
+    total_pasajeros = adultos + ninos
+    gran_total_viaje = costo_total_por_persona * total_pasajeros
     
     # Preparamos el texto del resumen
     destinos_str = ", ".join(destinos_seleccionados)
-    resumen_servicios = f"- ✈️🏨 Paquete Base ({destinos_str}): ${costo_base_total:,.2f} USD{desglose_multidestino_texto}\n"
+    resumen_servicios = f"- ✈️🏨 Paquete Base x {total_pasajeros} pax ({destinos_str}): ${costo_base_por_persona * total_pasajeros:,.2f} USD{desglose_multidestino_texto}\n"
         
     if tours_seleccionados:
         resumen_servicios += "- 🗺️ Top Tours seleccionados (En orden de prioridad):\n"
         for i, tour_key in enumerate(tours_seleccionados, 1):
             costo_t = tours_disponibles[tour_key]
-            costo_total += costo_t
-            resumen_servicios += f"   {i}. {tour_key}: ${costo_t:,.2f} USD\n"
+            resumen_servicios += f"   {i}. {tour_key}: ${costo_t * total_pasajeros:,.2f} USD\n"
 
     # ==========================================
     # MOSTRAR RESULTADOS
@@ -203,7 +212,10 @@ if len(fechas_input) == 2 and destinos_seleccionados:
     if "Otros (Especificar en comentarios)" in destinos_seleccionados:
         st.info("📌 Como incluiste un destino no listado, uno de nuestros expertos diseñará tu presupuesto a la medida. ¡Envíanos tus datos en el botón de abajo!")
     
-    st.metric(label="Inversión total aproximada (USD)", value=f"${costo_total:,.2f}")
+    # Mostrar métricas separadas para no asustar
+    col_met1, col_met2 = st.columns(2)
+    col_met1.metric(label="Estimado por Persona (USD)", value=f"${costo_total_por_persona:,.2f}")
+    col_met2.metric(label=f"Gran Total ({total_pasajeros} Pasajeros)", value=f"${gran_total_viaje:,.2f}")
     
     with st.expander("Ver desglose de tu viaje y términos"):
         st.text(resumen_servicios)
@@ -225,7 +237,7 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         
         comentarios_texto = f"\n\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
         
-        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellidos}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Presupuesto Estimado Web:* ${costo_total:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica de suplemento multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
+        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellidos}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Gran Total Web:* ${gran_total_viaje:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
         
         mensaje_codificado = urllib.parse.quote(mensaje)
         link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
@@ -233,7 +245,7 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         st.markdown(f"""
             <a href="{link_whatsapp}" target="_blank">
                 <button style="background-color: #25D366; color: white; border: none; padding: 15px 32px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
-                    📲 Enviar Itinerario por WhatsApp
+                    📲 Enviar Itinerario a Sucursal Villahermosa
                 </button>
             </a>
         """, unsafe_allow_html=True)
