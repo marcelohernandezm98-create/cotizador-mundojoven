@@ -40,7 +40,7 @@ presupuesto = st.selectbox(
 )
 
 # Validación de campos obligatorios
-datos_completos = bool(nombre.strip() and apellido.strip() and email.strip() and telefono.strip() and presupuesto != "Selecciona un rango...")
+datos_completos = bool(nombre.strip() and apellidos.strip() and email.strip() and telefono.strip() and presupuesto != "Selecciona un rango...")
 
 st.write("---")
 
