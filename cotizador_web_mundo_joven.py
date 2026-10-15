@@ -25,12 +25,13 @@ col1, col2 = st.columns(2)
 
 with col1:
     nombre = st.text_input("Nombre *")
+    apellidos = st.text_input("Apellidos *")
     email = st.text_input("Correo Electrónico *")
-    adultos = st.number_input("Número de adultos", min_value=1, step=1, help="Campo opcional, por defecto es 1")
+    telefono = st.text_input("Teléfono / WhatsApp *")
+    
 
 with col2:
-    apellido = st.text_input("Apellido *")
-    telefono = st.text_input("Teléfono / WhatsApp *")
+    adultos = st.number_input("Número de adultos", min_value=1, step=1, help="Campo opcional, por defecto es 1")
     ninos = st.number_input("Número de niños", min_value=0, step=1, help="Campo opcional")
 
 presupuesto = st.selectbox(
