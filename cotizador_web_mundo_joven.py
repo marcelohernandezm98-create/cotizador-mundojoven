@@ -6,7 +6,7 @@ from datetime import datetime
 # CONFIGURACIÓN DE LA PÁGINA (B2C - Modo Cliente)
 # ==========================================
 st.info("💡 ** Esta pagina es para fines informativos. Todos los costos y precios mostrados son estimaciones aproximadas sujetas a cambios sin previo aviso y no constituyen una oferta comercial definitiva.**")
-st.set_page_config(page_title="Arma tu Viaje - Mundo Joven", page_icon="✈️", layout="centered")
+st.set_page_config(page_title="Arma tu Viaje", page_icon="✈️", layout="centered")
 
 # Simulación de Logo (Centrado)
 st.markdown("<h1 style='text-align: center; color: #e3001b;'>✈️ MUNDO JOVEN</h1>", unsafe_allow_html=True)
