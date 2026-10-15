@@ -225,7 +225,7 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         
         comentarios_texto = f"\n\n*Comentarios extra:* {comentarios_extra}" if comentarios_extra.strip() else ""
         
-        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellido}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Presupuesto Estimado Web:* ${costo_total:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica de suplemento multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
+        mensaje = f"¡Hola Mundo Joven Villahermosa! 👋\n\nArmé mi viaje en la web y me gustaría cotizarlo formalmente.\n\n*👤 MIS DATOS*\nNombre: {nombre} {apellidos}\nEmail: {email}\nTeléfono: {telefono}\nPasajeros: {adultos} Adulto(s), {ninos} Niño(s)\nPresupuesto estimado: {presupuesto}\n\n*✈️ MI VIAJE*\nDestinos: {destinos_str} ({region_seleccionada})\nTemporada: {etiqueta_temporada}\nServicios que busco:\n{resumen_servicios}\n*Presupuesto Estimado Web:* ${costo_total:,.2f} USD{comentarios_texto}\n\n*Nota:* Cotización basada en vuelos con equipaje (25kg+10kg), hospedaje 3 estrellas y lógica de suplemento multidestino ($350 USD por país extra).\n\n¿Me ayudan a cerrarlo?"
         
         mensaje_codificado = urllib.parse.quote(mensaje)
         link_whatsapp = f"https://wa.me/{522281310507}?text={mensaje_codificado}"
