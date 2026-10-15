@@ -153,6 +153,15 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         color_alerta = "success"
         
     # --- NUEVA LÓGICA DE CÁLCULO MULTIDESTINO ($350) ---
+    # ... existing code ...
+    if es_temporada_alta:
+        etiqueta_temporada = "☀️ Tarifa Estimada (Temporada Alta)"
+        color_alerta = "error"
+    else:
+        etiqueta_temporada = "🍃 Tarifa Estimada (Temporada Baja)"
+        color_alerta = "success"
+        
+    # --- LÓGICA DE CÁLCULO MULTIDESTINO ($350) ---
     precios_base_seleccionados = []
     
     for dest in destinos_seleccionados:
@@ -161,18 +170,30 @@ if len(fechas_input) == 2 and destinos_seleccionados:
         if precio_actual > 0: # Evitar procesar "Otros" matemáticamente aquí
             precios_base_seleccionados.append(precio_actual)
             
-    costo_base_total = 0
+    # ¡AQUÍ ESTÁ LA CLAVE! Inicializamos en 0 antes de cualquier condición
+    costo_base_por_persona = 0
     desglose_multidestino_texto = ""
     
     if precios_base_seleccionados:
-        # Tomamos el destino más barato como "Paquete Base" (Incluye vuelo transatlántico)
         costo_base_principal = min(precios_base_seleccionados)
-        # Calculamos cuántos países adicionales hay
         paises_extra = len(precios_base_seleccionados) - 1
-        # Sumamos $350 USD por cada país extra
         suplemento = paises_extra * 350
+        costo_base_por_persona = costo_base_principal + suplemento
         
-        costo_base_total = costo_base_principal + suplemento
+        if paises_extra > 0:
+            desglose_multidestino_texto = f" (Incluye vuelo principal + suplemento por {paises_extra} país(es) adicional(es))"
+            
+    # --- CÁLCULO DE TOURS POR PERSONA ---
+    costo_tours_por_persona = 0
+    if tours_seleccionados:
+        for tour_key in tours_seleccionados:
+            costo_tours_por_persona += tours_disponibles[tour_key]
+
+    # Ahora sí sumará sin error porque ambas variables existen
+    costo_total_por_persona = costo_base_por_persona + costo_tours_por_persona
+    
+    # --- CÁLCULO TOTAL DE PASAJEROS ---
+# ... existing code ...
         
         if paises_extra > 0:
             desglose_multidestino_texto = f" (Incluye vuelo principal + suplemento por {paises_extra} país(es) adicional(es))"
